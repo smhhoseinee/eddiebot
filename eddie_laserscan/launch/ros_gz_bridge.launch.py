@@ -20,10 +20,9 @@ def generate_launch_description():
             package='ros_gz_bridge', 
             executable='parameter_bridge', 
             name='parameter_bridge',
-            arguments=['/model/eddiebot/cmd_vel@sensor_msgs/msg/Image@gz.msgs.Image'],
+            arguments=['/kinect_rgbd_camera/image@sensor_msgs/msg/Image@gz.msgs.Image'],
             output='screen'
         ),
-
 
         Node(
             package='ros_gz_bridge', 
@@ -47,6 +46,4 @@ def generate_launch_description():
             name='eddie_laserscan'
         ),
 
-
-        
     ])

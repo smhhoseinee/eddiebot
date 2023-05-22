@@ -6,6 +6,10 @@ from rclpy.action import ActionClient
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
 from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import Image
+
+import cv2
+import numpy as np
 
 
 class Eddie_laserscan(Node):
@@ -18,35 +22,45 @@ class Eddie_laserscan(Node):
         
         self.pub = self.create_publisher(Twist, '/model/eddiebot/cmd_vel', 10)
         self.subscription = self.create_subscription(
-            LaserScan,
-            '/lidar',
+            Image,
+            '/kinect_rgbd_camera/image',
             self.listener_callback,
             10)
         self.subscription  # prevent unused variable warning
-        self.scann = LaserScan()
+        self.img = Image()
 
-        self.call_timer = self.create_timer(2.0, self._timer_cb)
+        # self.call_timer = self.create_timer(2.0, self._timer_cb)
 
     def listener_callback(self, msg):
-        # print(len(msg.ranges)) #len is 2019 from 0-360
-        # self.get_logger().info('Listener received: state is"%d"' % self.state)
+        self.get_logger().info(f"recieved image:  {msg.width}x{msg.height}, {msg.encoding}")    
         
-            self.scann.ranges = msg.ranges[0:72]
-
-            allMore = True
-            for i in msg.ranges:
-                if i < 0.4:
-                    allMore = False #a wall detected
-                    break
-
-            if abs(time.time() - self.pivot_begin_time) > 2.0 or self.first_time:
-                if not allMore:
-                    self.state = -1
-                    self.get_logger().info('Wall detected, state is"%d"' % self.state)
-                    self.pivot_begin_time = time.time()
-                    self.first_time = False
-                else:
-                    self.state = 1
+        # Convert ROS Image message to OpenCV image
+        img = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        # Define color ranges for red, yellow, and green
+        lower_red = np.array([0, 50, 50])
+        upper_red = np.array([10, 255, 255])
+        lower_yellow = np.array([20, 100, 100])
+        upper_yellow = np.array([30, 255, 255])
+        lower_green = np.array([60, 100, 100])
+        upper_green = np.array([70, 255, 255])
+        # Threshold the image to extract the colors
+        mask_red = cv2.inRange(img, lower_red, upper_red)
+        mask_yellow = cv2.inRange(img, lower_yellow, upper_yellow)
+        mask_green = cv2.inRange(img, lower_green, upper_green)
+        # Count the number of pixels for each color
+        count_red = cv2.countNonZero(mask_red)
+        count_yellow = cv2.countNonZero(mask_yellow)
+        count_green = cv2.countNonZero(mask_green)
+        # Determine which color has the most pixels
+        if count_red > count_yellow and count_red > count_green:
+            self.get_logger().info("Red is the dominant color")
+        elif count_yellow > count_red and count_yellow > count_green:
+            self.get_logger().info("Yellow is the dominant color")
+        elif count_green > count_red and count_green > count_yellow:
+            self.get_logger().info("Green is the dominant color")
+        else:
+            self.get_logger().info("No dominant color found")
 
 
     def _timer_cb(self):
